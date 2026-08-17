@@ -49,6 +49,37 @@ Think of it like a photo: FP32 is the full-quality photo, INT8 is a compressed v
 - `results_summary.txt` — a plain-text summary you can copy into your report
 
 
+## Results
+
+Here's what we found when we ran the test (YOLOv8n model, COCO128 images, Google Colab CPU):
+
+| Metric | FP32 (original) | INT8 (shrunk) | Change |
+|---|---|---|---|
+| Speed (FPS) | 4.39 | 3.72 | **15% slower** |
+| Avg. time per image | 227.7 ms | 268.6 ms | slower |
+| File size | 12.85 MB | 3.50 MB | **72.7% smaller** |
+| Memory used (RAM) | 717.9 MB | 718.1 MB | basically the same |
+| Accuracy (mAP50-95) | 0.4454 | 0.4342 | **2.5% drop** |
+
+### What this actually means
+
+- **The file got much smaller** — shrinking it from ~13 MB to ~3.5 MB. That's a real win if you're trying to fit a model onto a small device with limited storage.
+- **Accuracy barely changed** — only about a 2.5% drop. So the shrunk model is still almost as good at detecting objects.
+- **But it did NOT get faster — it actually got a bit slower.** This is the most interesting finding of the project.
+
+### Why did the "shrunk" model run slower?
+
+This might seem backwards, but it's a real and well-known effect, not a mistake:
+
+- The type of quantization we used (**dynamic INT8**) makes the file smaller, but the CPU still has to do extra work converting numbers back and forth between low-precision (INT8) and high-precision (FP32) during every calculation.
+- **Real speed gains from quantization usually need special hardware** (like an NVIDIA GPU with TensorRT, an Intel chip with OpenVINO optimizations, or a dedicated AI chip) that can run INT8 math natively and fast. A plain CPU in Google Colab doesn't have that hardware advantage, so we get the smaller file size without the speed boost.
+- This is actually a useful, honest research finding: **quantization isn't automatically faster everywhere — it depends heavily on the hardware you run it on.** On the actual embedded chips this project is meant to simulate (which often *do* have INT8-optimized hardware), the speed result would likely look very different — smaller AND faster. That's a great point to raise in your report's discussion section.
+
+### Limitations 
+
+- We used ONNX Runtime's dynamic INT8 quantization instead of a hardware-specific tool like TensorRT, because TensorRT needs an NVIDIA GPU which wasn't available.
+- We tested on COCO128 (128 images) instead of the full COCO dataset (5,000+ images) so the test could finish in a reasonable time on a CPU. Treat the accuracy numbers as a general trend, not a lab-grade benchmark.
+
 ## Quick summary of the whole idea
 
 1. Take a normal AI model → **shrink it** (quantize)
